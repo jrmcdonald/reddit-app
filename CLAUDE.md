@@ -56,7 +56,7 @@ and `fix:` are what users see in the changelog and SideStore; `docs:`,
 hand: merging release-please's "chore: release x.y.z" pull request does, and
 the Release workflow then builds that commit and attaches the IPA and the
 SideStore source (`scripts/release/`) to the GitHub release. The default
-branch is `master`.
+branch is `main`.
 
 ## Layout
 

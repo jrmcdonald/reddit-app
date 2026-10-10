@@ -99,8 +99,7 @@ Every feed has a sort (Best/Hot/New/Top with a period/Rising) and a view
 - [x] README describing the app and its API use, for the application
 - [x] Repo scaffold: Expo SDK 57, TypeScript strict, lint, format, Jest
 - [x] CI, iOS build, release and simulator workflows; Renovate; release-please
-- [ ] Rename nothing: the default branch is `master` (or rename it to `main`
-      and change the workflows' branch filters together)
+- [x] Default branch `main`, as in pokecollector-app
 - [ ] Apply for API access, with the README and the simulator screenshots
 - [ ] First dev client build; commit the `native/Podfile.lock` it prints
 

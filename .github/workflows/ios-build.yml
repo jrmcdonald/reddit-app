@@ -6,7 +6,7 @@
 # each release's production build. Standard runners cost nothing on a public
 # repository.
 #
-# The build number is the commit count, so each build of master is higher than
+# The build number is the commit count, so each build of main is higher than
 # the last, as SideStore and iOS expect of an update.
 #
 # Nothing about the Reddit app (its client ID) goes into the build. Set the

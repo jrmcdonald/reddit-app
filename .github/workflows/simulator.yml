@@ -18,17 +18,17 @@
 # pull request, or run this workflow by hand with "approve" ticked. The run
 # commits them to the branch. See e2e/README.md.
 #
-# It also runs on every push to master that touches the app. That run is the
+# It also runs on every push to main that touches the app. That run is the
 # one that matters for speed: GitHub caches belong to the branch that saved
-# them, and a pull request can restore only its own and master's. Without a
-# cache saved on master, every new pull request would compile from cold.
+# them, and a pull request can restore only its own and main's. Without a
+# cache saved on main, every new pull request would compile from cold.
 #
 # Free on a public repository, like every standard runner.
 name: Simulator
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - 'src/**'
       - 'assets/**'
@@ -189,11 +189,11 @@ jobs:
           grep -q '\*\* BUILD SUCCEEDED' build/app-build.log
 
       # Saved even if the build failed, so the next run still starts warmer.
-      # Only from master: the repository's caches share 10 GB, oldest out
-      # first, and a save from every pull request push would push out master's,
+      # Only from main: the repository's caches share 10 GB, oldest out
+      # first, and a save from every pull request push would push out main's,
       # the one every new pull request starts from.
       - name: Save the compiler cache
-        if: always() && github.ref == 'refs/heads/master'
+        if: always() && github.ref == 'refs/heads/main'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.ccache

@@ -61,10 +61,3 @@ Native are large, old, or both, and miss Reddit's spoilers and superscript.
 `src/utils/markdown.ts` parses the subset Reddit uses into blocks and runs
 that `src/components/markdown.tsx` draws with native text, and anything it
 does not understand is shown as text. Tables are the known gap.
-
-## 2026-10-10 — The default branch is `master`
-
-The README went up first, on `master`, and the workflows trigger on it.
-pokecollector-app uses `main`; renaming means changing the branch filters in
-`ci.yml`, `release.yml` and `simulator.yml`, and the cache condition in
-`simulator.yml`, in the same change.

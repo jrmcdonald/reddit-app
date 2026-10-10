@@ -1,6 +1,6 @@
 # Releases, with release-please.
 #
-# Every push to master updates a "chore: release x.y.z" pull request from the
+# Every push to main updates a "chore: release x.y.z" pull request from the
 # Conventional Commits since the last release: feat raises the minor version,
 # fix the patch, and a "!" or BREAKING CHANGE the major. It holds the next
 # CHANGELOG.md entry and the version in package.json. Merging it tags the
@@ -10,14 +10,14 @@
 #
 # The release pull request is opened with GITHUB_TOKEN, so other workflows do
 # not run on it (GitHub's rule against workflows starting workflows). It only
-# changes the version and the changelog, and CI runs on master once it merges.
+# changes the version and the changelog, and CI runs on main once it merges.
 # The repository must allow GitHub Actions to create pull requests (Settings →
 # Actions → General).
 name: Release
 
 on:
   push:
-    branches: [master]
+    branches: [main]
 
 permissions:
   contents: read
