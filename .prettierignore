@@ -1,0 +1,7 @@
+ios/
+android/
+.expo/
+package-lock.json
+# release-please writes these, in its own style.
+CHANGELOG.md
+.release-please-manifest.json

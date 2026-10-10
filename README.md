@@ -7,8 +7,10 @@ Perch is for reading: your home feed, Popular, any subreddit, posts and their
 comments, and the posts you save. It does not post, comment, vote, message or
 moderate, and it has no ads, analytics or tracking.
 
-> **Status:** planning. The app is not built yet. This README describes what it
-> will do and exactly how it will use Reddit's API.
+> **Status:** early. The app is built and tested against a fake Reddit with
+> made-up data (see [Screenshots](#screenshots)); it has not yet talked to the
+> real API, pending Reddit's approval. This README describes what it does and
+> exactly how it uses Reddit's API.
 
 ## Features
 
@@ -27,25 +29,25 @@ moderate, and it has no ads, analytics or tracking.
 Perch is a non-commercial, single-user client of the Reddit Data API, used
 within Reddit's Developer Terms and Data API Terms.
 
-| | |
-| --- | --- |
-| App type | Installed app (no client secret) |
-| Users | One: the developer |
-| Sign-in | OAuth 2 authorization code flow in Safari's secure sign-in sheet (`ASWebAuthenticationSession`). The app never sees the Reddit password. |
-| Redirect URI | `perch://oauth/callback` |
-| Token storage | The refresh token is kept in the iOS Keychain on the device, and is revoked on sign-out |
-| Anonymous mode | Application-only OAuth (`https://oauth.reddit.com/grants/installed_client`), with no user account |
-| User-Agent | `ios:perch:<version> (by /u/<developer>)` |
+|                |                                                                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| App type       | Installed app (no client secret)                                                                                                         |
+| Users          | One: the developer                                                                                                                       |
+| Sign-in        | OAuth 2 authorization code flow in Safari's secure sign-in sheet (`ASWebAuthenticationSession`). The app never sees the Reddit password. |
+| Redirect URI   | `perch://oauth/callback`                                                                                                                 |
+| Token storage  | The refresh token is kept in the iOS Keychain on the device, and is revoked on sign-out                                                  |
+| Anonymous mode | Application-only OAuth (`https://oauth.reddit.com/grants/installed_client`), with no user account                                        |
+| User-Agent     | `ios:<bundle ID>:v<version> (by /u/<username>)`                                                                                          |
 
 ### Scopes
 
-| Scope | Why |
-| --- | --- |
-| `identity` | Show which account is signed in |
-| `read` | Read feeds, subreddits, posts and comments |
-| `mysubreddits` | Build the home feed and list subscriptions |
-| `history` | Read the signed-in user's saved posts and comments |
-| `save` | Save and unsave posts and comments |
+| Scope          | Why                                                |
+| -------------- | -------------------------------------------------- |
+| `identity`     | Show which account is signed in                    |
+| `read`         | Read feeds, subreddits, posts and comments         |
+| `mysubreddits` | Build the home feed and list subscriptions         |
+| `history`      | Read the signed-in user's saved posts and comments |
+| `save`         | Save and unsave posts and comments                 |
 
 No other scopes are requested. In particular, Perch never asks for `submit`,
 `vote`, `edit`, `privatemessages` or any moderation scope.
@@ -68,10 +70,26 @@ No other scopes are requested. In particular, Perch never asks for `submit`,
 - Deleted content is not archived: cached items are refreshed from Reddit, and
   anything Reddit no longer returns is dropped.
 
+## Screenshots
+
+Every screen, signed in and anonymous, in light and dark, is captured by the
+simulator tests against a fake Reddit with made-up data, and kept in
+[`e2e/screenshots/`](e2e/screenshots) once approved. See
+[`e2e/README.md`](e2e/README.md).
+
 ## Built with
 
 [Expo](https://expo.dev) and React Native, written in TypeScript. iOS builds
-run on GitHub Actions, and the app is installed with SideStore.
+run on GitHub Actions, and the app is installed with SideStore. The plan is in
+[`docs/PLAN.md`](docs/PLAN.md), the reasons for its choices in
+[`docs/DECISIONS.md`](docs/DECISIONS.md), and every endpoint it calls in
+[`docs/API.md`](docs/API.md).
+
+```bash
+npm install
+npm test            # unit tests, and the app's client against the fake Reddit
+npm run lint && npm run typecheck
+```
 
 ## Not affiliated with Reddit
 
