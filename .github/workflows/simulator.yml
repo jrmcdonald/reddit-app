@@ -1,0 +1,489 @@
+# Screenshot tests and Apple's accessibility audit, on the iOS simulator.
+#
+# Builds the production app for the simulator, pointed at a fake Reddit
+# (e2e/server) that serves it made-up data, and runs the walkthrough (e2e/ios) at the
+# default text size and at the largest accessibility size. Each run
+# screenshots every main screen and audits it. The default-size screenshots
+# are compared with the approved ones in e2e/screenshots.
+#
+# Three stages, so the slow parts overlap:
+#   build        one macOS runner builds the app and the walkthrough, with
+#                ccache keeping compiled native code between runs
+#   simulator    two macOS runners walk the app at the same time, one text
+#                size each, each with its own simulator and fake server
+#   walkthrough  a Linux runner compares, reports, and approves when asked;
+#                its result is the check to look at
+#
+# To approve a run's screenshots, add the approve-screenshots label to the
+# pull request, or run this workflow by hand with "approve" ticked. The run
+# commits them to the branch. See e2e/README.md.
+#
+# It also runs on every push to main that touches the app. That run is the
+# one that matters for speed: GitHub caches belong to the branch that saved
+# them, and a pull request can restore only its own and main's. Without a
+# cache saved on main, every new pull request would compile from cold.
+#
+# Free on a public repository, like every standard runner.
+name: Simulator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'e2e/**'
+      - 'app.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'native/**'
+      - 'scripts/ci/**'
+      - '.github/workflows/simulator.yml'
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'e2e/**'
+      - 'app.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'native/**'
+      - 'scripts/ci/**'
+      - '.github/workflows/simulator.yml'
+  workflow_dispatch:
+    inputs:
+      approve:
+        description: Commit this run's screenshots to the branch as the approved ones
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# A label other than approve-screenshots starts a run that does nothing, but
+# concurrency applies before any job's `if:`. In the branch's group it would
+# cancel the real run, and its own skipped jobs would count as a pass: Renovate
+# labels every pull request it opens, then automerges. So it gets a group of
+# its own.
+concurrency:
+  group: simulator-${{ github.head_ref || github.ref_name }}${{ github.event.action == 'labeled' && github.event.label.name != 'approve-screenshots' && format('-ignored-{0}', github.run_id) || '' }}
+  cancel-in-progress: true
+
+# Bash with pipefail, so `cmd | tee log` fails when cmd does.
+defaults:
+  run:
+    shell: bash
+
+env:
+  EXPO_NO_TELEMETRY: 1
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  # Pinned, so a new runner image cannot change the build or the screenshots
+  # under an unchanged commit, and the build and walkthrough runners match.
+  # The approved screenshots belong to this device (e2e/screenshots/device.txt);
+  # changing any of these means approving them again.
+  XCODE_VERSION: '26.6'
+  SIM_DEVICE: iPhone 17 Pro
+  SIM_OS: '26.5'
+
+jobs:
+  build:
+    # Other labels are not a reason to spend the time.
+    if: github.event.action != 'labeled' || github.event.label.name == 'approve-screenshots'
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      APP_VARIANT: production
+      # Every Reddit address in the build points at the fake server the
+      # walkthrough runners start (see app.config.ts).
+      REDDIT_ORIGIN: https://localhost:8443
+      # React Native's pods wrap clang in ccache when this is set and ccache
+      # is installed; see "Install pods".
+      USE_CCACHE: 1
+      CCACHE_MAXSIZE: 2G
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Toolchain
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version
+          node --version
+          brew install xcodegen ccache
+          echo "CCACHE_DIR=${HOME}/.ccache" >> "$GITHUB_ENV"
+          # React Native's wrapper (scripts/xcode/ccache-clang.sh) runs
+          # `exec $CCACHE_BINARY clang`. The pods set CCACHE_BINARY as a build
+          # setting, but Xcode does not pass build settings to the compiler's
+          # environment, so the wrapper ran plain clang and nothing was ever
+          # cached. Set in the environment, xcodebuild hands it down.
+          echo "CCACHE_BINARY=$(command -v ccache)" >> "$GITHUB_ENV"
+
+      - run: npm ci
+
+      - name: Generate the native project
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          # Its own prefix: these pods are installed with ccache, the iOS
+          # build's are not. The Xcode version too, for prebuilt frameworks.
+          key: pods-simulator-${{ env.XCODE_VERSION }}-${{ hashFiles('package-lock.json', 'app.config.ts', 'native/Podfile.lock') }}
+
+      # Compiled objects from earlier runs. ccache looks each one up by its
+      # inputs, so an older cache still serves every file that has not
+      # changed. A cache key cannot be overwritten, so each run saves under
+      # its own and restores the newest.
+      - name: Restore the compiler cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ccache
+          key: ccache-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ hashFiles('package-lock.json') }}-
+            ccache-
+
+      # Expo's Podfile reads apple.ccacheEnabled; React Native's own default
+      # reads USE_CCACHE. Both are set, so either way the compiler is wrapped.
+      # This touches only the generated project on the runner, not the app's
+      # configuration.
+      - name: Install pods
+        run: |
+          jq '. + {"apple.ccacheEnabled": "true"}' ios/Podfile.properties.json > ios/Podfile.properties.tmp
+          mv ios/Podfile.properties.tmp ios/Podfile.properties.json
+          scripts/ci/pod-install.sh pod-install.log
+          grep -i ccache pod-install.log || echo "::warning::pod install did not mention ccache"
+
+      # Release, so the JavaScript is bundled in and no Metro is needed. Built
+      # for any simulator, so no simulator is needed here: the walkthrough
+      # runners have their own.
+      - name: Build the app for the simulator
+        run: |
+          set -o pipefail
+          ccache --zero-stats
+          mkdir -p build
+          workspace=$(ls -d ios/*.xcworkspace | head -n 1)
+          scheme=$(basename "${workspace}" .xcworkspace)
+          xcodebuild build \
+            -workspace "${workspace}" \
+            -scheme "${scheme}" \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/app \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+            | tee build/app-build.log | { grep -E 'error:|\*\* BUILD' || true; }
+          ccache --show-stats
+          # A cache that is never asked looks the same as one that works until
+          # the timings are compared, so say so in the run.
+          calls=$(ccache --print-stats | awk '$1 ~ /^(direct_cache_hit|preprocessed_cache_hit|cache_miss)$/ { n += $2 } END { print n + 0 }')
+          echo "ccache answered ${calls} compiler calls"
+          [ "${calls}" -gt 0 ] || echo "::warning::ccache saw no compiler calls; the build did not go through it"
+          # The .app exists before its build finishes, so only this says it did.
+          grep -q '\*\* BUILD SUCCEEDED' build/app-build.log
+
+      # Saved even if the build failed, so the next run still starts warmer.
+      # Only from main: the repository's caches share 10 GB, oldest out
+      # first, and a save from every pull request push would push out main's,
+      # the one every new pull request starts from.
+      - name: Save the compiler cache
+        if: always() && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ccache
+          key: ccache-${{ hashFiles('package-lock.json') }}-${{ github.run_id }}
+
+      - name: Build the walkthrough
+        run: |
+          set -o pipefail
+          (cd e2e/ios && xcodegen generate)
+          xcodebuild build-for-testing \
+            -project e2e/ios/Walkthrough.xcodeproj \
+            -scheme Walkthrough \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/walkthrough \
+            | tee build/walkthrough-build.log | { grep -E 'error:|\*\* TEST BUILD' || true; }
+          grep -q '\*\* TEST BUILD SUCCEEDED' build/walkthrough-build.log
+
+      # A tarball, because artifacts lose the executable bit, and an app
+      # without it does not launch.
+      - name: Pack the builds
+        run: |
+          tar -czf simulator-builds.tgz \
+            build/app/Build/Products/Release-iphonesimulator \
+            build/walkthrough/Build/Products
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: simulator-builds
+          path: simulator-builds.tgz
+          # Long enough to re-run a failed walkthrough the next day.
+          retention-days: 3
+          overwrite: true
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: simulator-build-logs
+          path: |
+            build/*.log
+            pod-install.log
+            ios/Podfile.lock
+          retention-days: 7
+          overwrite: true
+          if-no-files-found: ignore
+
+  simulator:
+    name: simulator (${{ matrix.name }})
+    needs: build
+    runs-on: macos-26
+    # A walkthrough takes 7 to 17 minutes, and one that times out runs once
+    # more from a freshly erased simulator.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            size: large
+          - name: largest
+            size: accessibility-extra-extra-extra-large
+    env:
+      SERVER_URL: https://localhost:8443
+      OUT: ${{ github.workspace }}/e2e-output
+    steps:
+      # First, because checkout empties a directory that is not yet a
+      # repository, and the next step writes into it.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # The pinned device on the pinned iOS, booted before anything else: a
+      # runner's first boot does one-off work that stalled the app for up to a
+      # minute at a time when left to the walkthrough, and the setup below
+      # gives it time to finish. The device's name goes next to the approved
+      # screenshots, since they only match on the same model.
+      - name: Pick and boot a simulator
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          runtime="com.apple.CoreSimulator.SimRuntime.iOS-${SIM_OS//./-}"
+          udid=$(xcrun simctl list devices available --json | jq -r --arg runtime "${runtime}" --arg name "${SIM_DEVICE}" '
+            [.devices[$runtime][]? | select(.name == $name) | .udid] | first // empty')
+          if [ -z "${udid}" ]; then
+            echo "::error::No ${SIM_DEVICE} on iOS ${SIM_OS} on this runner; update SIM_DEVICE and SIM_OS, and approve the screenshots again" >&2
+            xcrun simctl list devices available
+            exit 1
+          fi
+          device="${SIM_DEVICE}, iOS ${SIM_OS}"
+          echo "Using ${device} (${udid})"
+          mkdir -p "${OUT}"
+          echo "${device}" > "${OUT}/device.txt"
+          echo "SIM_UDID=${udid}" >> "$GITHUB_ENV"
+          xcrun simctl boot "${udid}" || xcrun simctl bootstatus "${udid}"
+
+      # The fake server uses nothing but Node itself: no npm install here.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: simulator-builds
+
+      - name: Unpack the builds
+        run: |
+          tar -xzf simulator-builds.tgz
+          app=$(ls -d build/app/Build/Products/Release-iphonesimulator/*.app | head -n 1)
+          test -d "${app}"
+          echo "APP_PATH=${PWD}/${app}" >> "$GITHUB_ENV"
+          echo "APP_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "${app}/Info.plist")" >> "$GITHUB_ENV"
+
+      # A throwaway certificate authority, made fresh for each run, and a
+      # certificate for localhost signed by it. iOS wants a SAN, serverAuth
+      # and a short life for a certificate from a user-installed root.
+      - name: Start the fake server
+        run: |
+          # Homebrew's OpenSSL 3 by name: -addext and these extensions are
+          # what iOS checks, and LibreSSL's openssl handles them differently.
+          openssl="$(brew --prefix openssl@3)/bin/openssl"
+          [ -x "${openssl}" ] || brew install openssl@3
+          "${openssl}" version
+          tls="${RUNNER_TEMP}/tls"
+          mkdir -p "${tls}"
+          cd "${tls}"
+          "${openssl}" req -x509 -newkey rsa:2048 -nodes -days 2 -keyout ca-key.pem -out ca.pem \
+            -subj "/CN=Perch walkthrough CA" \
+            -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign"
+          "${openssl}" req -newkey rsa:2048 -nodes -keyout server-key.pem -out server.csr -subj "/CN=localhost"
+          printf '%s\n' "subjectAltName=DNS:localhost,IP:127.0.0.1" "extendedKeyUsage=serverAuth" \
+            "basicConstraints=CA:FALSE" "keyUsage=critical,digitalSignature,keyEncipherment" > server.ext
+          "${openssl}" x509 -req -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -days 2 \
+            -sha256 -extfile server.ext -out server.pem
+          echo "CA_CERT=${tls}/ca.pem" >> "$GITHUB_ENV"
+          cd "${GITHUB_WORKSPACE}"
+          nohup node e2e/server/fake-server.ts --port 8443 \
+            --cert "${tls}/server.pem" --key "${tls}/server-key.pem" > "${OUT}/server.log" 2>&1 &
+          server=$!
+          for _ in $(seq 1 30); do
+            if ! kill -0 "${server}" 2>/dev/null; then
+              echo "::error::The fake server exited" >&2
+              cat "${OUT}/server.log"
+              exit 1
+            fi
+            curl -fsS --max-time 3 --cacert "${tls}/ca.pem" -o /dev/null "${SERVER_URL}/icons/health.png" && exit 0
+            sleep 1
+          done
+          cat "${OUT}/server.log"
+          exit 1
+
+      - name: Walkthrough at the ${{ matrix.name }} text size
+        run: e2e/walkthrough.sh ${{ matrix.name }} ${{ matrix.size }}
+
+      # Everything the report needs, whether or not the walkthrough passed.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: simulator-output-${{ matrix.name }}
+          path: |
+            e2e-output
+            !e2e-output/*.xcresult
+          retention-days: 14
+          overwrite: true
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: simulator-results-${{ matrix.name }}
+          path: e2e-output/*.xcresult
+          retention-days: 7
+          overwrite: true
+          if-no-files-found: ignore
+
+  # The check to look at, under the name it has always had: it compares the
+  # screenshots, reports both audits, approves when asked, and fails if
+  # either walkthrough or the comparison did.
+  walkthrough:
+    needs: [build, simulator]
+    # Also when a walkthrough failed, to report it; not when the run was
+    # cancelled (a newer push replaces it). A failed walkthrough is reported
+    # but never approved; see "Approve these screenshots".
+    if: ${{ !cancelled() && needs.build.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Only for approving: committing screenshots and removing the label.
+      contents: write
+      pull-requests: write
+    env:
+      OUT: ${{ github.workspace }}/e2e-output
+      APPROVE: ${{ inputs.approve || github.event.label.name == 'approve-screenshots' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Both runs' outputs side by side, as one run used to leave them:
+      # default/ and largest/, with the default run's device name on top.
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: simulator-output-*
+          path: ${{ runner.temp }}/outputs
+
+      - name: Gather the outputs
+        run: |
+          mkdir -p "${OUT}"
+          for name in default largest; do
+            dir="${RUNNER_TEMP}/outputs/simulator-output-${name}"
+            if [ -d "${dir}" ]; then
+              cp -R "${dir}/." "${OUT}/"
+              cp "${dir}/server.log" "${OUT}/server-${name}.log" 2>/dev/null || true
+            fi
+          done
+          if [ -f "${RUNNER_TEMP}/outputs/simulator-output-default/device.txt" ]; then
+            cp "${RUNNER_TEMP}/outputs/simulator-output-default/device.txt" "${OUT}/device.txt"
+          fi
+          # Not a pipe into head: under pipefail, ls stopped early fails the step.
+          ls -R "${OUT}" > "${RUNNER_TEMP}/outputs.txt"
+          head -n 80 "${RUNNER_TEMP}/outputs.txt"
+
+      - name: Report
+        id: report
+        continue-on-error: true
+        run: node e2e/report.ts --output "${OUT}" --approved e2e/screenshots
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: simulator-screenshots
+          path: e2e-output
+          retention-days: 14
+          overwrite: true
+          if-no-files-found: ignore
+
+      # Only from a run where both walkthroughs finished: a walkthrough that
+      # stopped early leaves a partial set, and approving it would delete the
+      # rest. The label stays on until a run passes and approves.
+      - name: Approve these screenshots
+        if: always() && env.APPROVE == 'true' && needs.simulator.result == 'success'
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          shots=("${OUT}"/default/*.png)
+          if [ ${#shots[@]} -eq 0 ]; then
+            echo "::error::No screenshots to approve" >&2
+            exit 1
+          fi
+          git fetch --depth=1 origin "${BRANCH}"
+          git checkout -B "${BRANCH}" "origin/${BRANCH}"
+          rm -rf e2e/screenshots
+          mkdir -p e2e/screenshots
+          cp "${shots[@]}" e2e/screenshots/
+          cp "${OUT}/device.txt" e2e/screenshots/device.txt
+          git add -A e2e/screenshots
+          if git diff --cached --quiet; then
+            echo "The approved screenshots are already these."
+          else
+            git -c user.name='github-actions[bot]' \
+                -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+                commit -m "test: approve simulator screenshots" \
+                -m "From ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}, on $(cat "${OUT}/device.txt")."
+            git push origin "HEAD:${BRANCH}"
+          fi
+          if [ -n "${PR}" ]; then
+            gh pr edit "${PR}" --remove-label approve-screenshots
+          fi
+
+      - name: Result
+        if: always()
+        env:
+          BUILD: ${{ needs.build.result }}
+          WALKS: ${{ needs.simulator.result }}
+        run: |
+          failed=0
+          if [ "${BUILD}" != success ]; then
+            echo "::error::The build failed; see the build job's log"
+            exit 1
+          fi
+          if [ "${WALKS}" != success ]; then
+            echo "::error::A walkthrough failed; see the simulator jobs and the summary"
+            failed=1
+          fi
+          if [ "${{ steps.report.outcome }}" != success ] && [ "${APPROVE}" != true ]; then
+            echo "::error::Screenshots differ from the approved ones; see the summary"
+            failed=1
+          fi
+          exit "${failed}"

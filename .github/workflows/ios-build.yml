@@ -1,0 +1,169 @@
+# Builds an unsigned IPA for AltStore to sign with a free Apple ID.
+#
+# Run by hand for the dev client: it is only needed when native code changes
+# (a new native dependency, an Expo SDK bump, or app.config.ts), since
+# JavaScript changes reach it over Metro. The Release workflow calls it for
+# each release's production build. Standard runners cost nothing on a public
+# repository.
+#
+# The build number is the commit count, so each build of main is higher than
+# the last, as SideStore and iOS expect of an update.
+#
+# Nothing about the Reddit app (its client ID) goes into the build. Set the
+# BUNDLE_ID_PREFIX Actions variable to build under your own reverse-DNS prefix.
+name: iOS build
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: development is the dev client (loads JS from Metro); production bundles the JS
+        type: choice
+        options: [development, production]
+        default: development
+  workflow_call:
+    inputs:
+      variant:
+        description: development or production
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# A newer build by hand replaces one still running; a release's build is never
+# cancelled. When called, github.workflow is the caller's, so the two never
+# share a group.
+concurrency:
+  group: ${{ github.workflow }}-ios-build-${{ inputs.variant }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
+
+# Bash with pipefail, so `cmd | tee log` fails when cmd does.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    # Pinned, like the Simulator workflow's, so a new runner image cannot
+    # change a build under an unchanged commit.
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      APP_VARIANT: ${{ inputs.variant }}
+      BUNDLE_ID_PREFIX: ${{ vars.BUNDLE_ID_PREFIX }}
+      EXPO_NO_TELEMETRY: 1
+      XCODE_VERSION: '26.6'
+      # The dev client needs Debug for its launcher; production is a Release build.
+      CONFIGURATION: ${{ inputs.variant == 'production' && 'Release' || 'Debug' }}
+    steps:
+      # All of history, for the commit count.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Build number
+        run: echo "BUILD_NUMBER=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Toolchain
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version
+          pod --version
+
+      - run: npm ci
+
+      - name: Generate the native project
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      # Key on what decides the pods: the npm lock file, the app config and
+      # the committed Podfile.lock, and the Xcode they were installed with.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: pods-${{ inputs.variant }}-${{ env.XCODE_VERSION }}-${{ hashFiles('package-lock.json', 'app.config.ts', 'native/Podfile.lock') }}
+
+      - name: Install pods
+        run: scripts/ci/pod-install.sh pod-install.log ${{ inputs.variant == 'development' && '--no-lock-report' || '' }}
+
+      # Prebuild names the workspace and scheme after the app's display name,
+      # which differs between variants ("Perch Dev" → PerchDev).
+      - name: Find the workspace and scheme
+        id: project
+        run: |
+          workspace=$(ls -d ios/*.xcworkspace | head -n 1)
+          scheme=$(basename "${workspace}" .xcworkspace)
+          if ! xcodebuild -list -json -workspace "${workspace}" \
+               | jq -e --arg s "${scheme}" '.workspace.schemes | index($s)' > /dev/null; then
+            echo "::error::Scheme ${scheme} not found in ${workspace}" >&2
+            xcodebuild -list -workspace "${workspace}"
+            exit 1
+          fi
+          echo "workspace=${workspace}" >> "$GITHUB_OUTPUT"
+          echo "scheme=${scheme}" >> "$GITHUB_OUTPUT"
+
+      # Unsigned: AltStore re-signs with the free Apple ID's certificate on the
+      # PC, which is the only signing a free account can do.
+      - name: Archive
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -workspace "${{ steps.project.outputs.workspace }}" \
+            -scheme "${{ steps.project.outputs.scheme }}" \
+            -configuration "${CONFIGURATION}" \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | tee build.log | { grep -E 'error:|\*\* ARCHIVE' || true; }
+          grep -q '\*\* ARCHIVE SUCCEEDED' build.log
+          test -d build/App.xcarchive/Products/Applications
+
+      - name: Package the IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/App.xcarchive/Products/Applications/*.app Payload/
+          zip -qry "Perch-${APP_VARIANT}.ipa" Payload
+          ls -lh "Perch-${APP_VARIANT}.ipa"
+
+      # What the app says about itself, for a release's SideStore source:
+      # SideStore checks the version, build and usage strings against the IPA.
+      # An unsigned build has no entitlements, so that file is usually absent.
+      - name: Describe the app
+        run: |
+          app=$(ls -d Payload/*.app | head -n 1)
+          plutil -convert json -o info.json "${app}/Info.plist"
+          plutil -p "${app}/Info.plist" | grep -E 'CFBundle(ShortVersionString|Version)"'
+          entitlements=$(ls ios/*/*.entitlements 2>/dev/null | head -n 1 || true)
+          if [ -n "${entitlements}" ]; then
+            plutil -convert json -o entitlements.json "${entitlements}"
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Perch-${{ inputs.variant }}
+          path: |
+            Perch-${{ inputs.variant }}.ipa
+            info.json
+            entitlements.json
+          retention-days: 14
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: build-log-${{ inputs.variant }}
+          path: |
+            build.log
+            pod-install.log
+          retention-days: 7
+          if-no-files-found: ignore
