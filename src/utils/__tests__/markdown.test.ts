@@ -1,4 +1,4 @@
-import { inlineText, parseInline, parseMarkdown } from '../markdown';
+import { hasLink, inlineText, parseInline, parseMarkdown, type Block } from '../markdown';
 import { plainText } from '../markdown-plain';
 
 describe('parseMarkdown', () => {
@@ -30,6 +30,68 @@ describe('parseMarkdown', () => {
 
   it('does not take a spoiler for a quote', () => {
     expect(parseMarkdown('>!hidden!< text')[0]?.type).toBe('paragraph');
+  });
+});
+
+describe('tables', () => {
+  const table = (source: string) => {
+    const block = parseMarkdown(source).find((b) => b.type === 'table');
+    return block as Extract<Block, { type: 'table' }> | undefined;
+  };
+  const text = (rows: Parameters<typeof inlineText>[0][]) => rows.map(inlineText);
+
+  it('reads the header, alignment and rows', () => {
+    const found = table(
+      'Before\n\n| Item | Count | Price |\n|:--|:-:|--:|\n| Rope | 2 | £4 |\n| Lamp | 1 | £12 |\n\nAfter',
+    );
+    expect(found?.align).toEqual(['left', 'center', 'right']);
+    expect(text(found?.header ?? [])).toEqual(['Item', 'Count', 'Price']);
+    expect(found?.rows.map(text)).toEqual([
+      ['Rope', '2', '£4'],
+      ['Lamp', '1', '£12'],
+    ]);
+    expect(
+      parseMarkdown('Before\n\n| a | b |\n|--|--|\n| 1 | 2 |\n\nAfter').map((b) => b.type),
+    ).toEqual(['paragraph', 'table', 'paragraph']);
+  });
+
+  it('takes pipes at the ends as optional, and pads short rows', () => {
+    const found = table('a | b | c\n--- | --- | ---\n1 | 2\n1 | 2 | 3 | 4');
+    expect(found?.align).toEqual([null, null, null]);
+    expect(found?.rows.map(text)).toEqual([
+      ['1', '2', ''],
+      ['1', '2', '3'],
+    ]);
+  });
+
+  it('keeps escaped pipes and pipes in code within a cell', () => {
+    const found = table('| a | b |\n|---|---|\n| x \\| y | `p|q` |');
+    expect(found?.rows.map(text)).toEqual([['x | y', 'p|q']]);
+  });
+
+  it('ends at a blank line or a line with no pipe', () => {
+    const blocks = parseMarkdown('| a | b |\n|---|---|\n| 1 | 2 |\nplain line');
+    expect(blocks.map((b) => b.type)).toEqual(['table', 'paragraph']);
+  });
+
+  it('interrupts a paragraph, as Reddit does', () => {
+    const blocks = parseMarkdown('Some text\n| a | b |\n|---|---|\n| 1 | 2 |');
+    expect(blocks.map((b) => b.type)).toEqual(['paragraph', 'table']);
+  });
+
+  it('is not a table without a matching delimiter row', () => {
+    expect(table('a | b\nnot a delimiter')).toBeUndefined();
+    expect(table('a | b\n---')).toBeUndefined();
+    expect(table('| a | b |\n|---|---|---|')).toBeUndefined();
+    expect(parseMarkdown('Text\n\n---').map((b) => b.type)).toEqual(['paragraph', 'rule']);
+  });
+
+  it('reads links and emphasis in cells', () => {
+    const found = table('| a |\n|---|\n| **bold** [link](https://example.com) |');
+    const cell = found?.rows[0]?.[0] ?? [];
+    expect(cell.map((node) => node.type)).toEqual(['bold', 'text', 'link']);
+    expect(hasLink(cell)).toBe(true);
+    expect(hasLink(found?.header[0] ?? [])).toBe(false);
   });
 });
 

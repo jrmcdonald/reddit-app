@@ -60,7 +60,7 @@ Posts and comments are Reddit Markdown. The JavaScript renderers for React
 Native are large, old, or both, and miss Reddit's spoilers and superscript.
 `src/utils/markdown.ts` parses the subset Reddit uses into blocks and runs
 that `src/components/markdown.tsx` draws with native text, and anything it
-does not understand is shown as text. Tables are the known gap.
+does not understand is shown as text.
 
 ## 2026-10-10 — Inline titles on the tab screens, not large titles
 
@@ -81,3 +81,13 @@ moved a cards-view title under the bar and failed a run. These findings,
 "Potentially inaccessible text" with no element, are written to `audit.tsv`
 marked "not counted" and do not fail the walkthrough. Every finding on an
 element still does, so a missing label or clipped text is still caught.
+
+## 2026-10-10 — Tables sized from their text, not measured
+
+Markdown tables draw row by row, each column as wide as its longest cell
+(about 8.5 points a character, between 56 and 240, scaled with the text
+size), so rows line up without measuring every cell first. A longer cell
+wraps within its column, and a table wider than the screen scrolls
+sideways. VoiceOver reads each row as one element, each cell after its
+column's heading ("Count: 2"), except a row with a link, whose cells it
+reads one by one so the link can be followed.

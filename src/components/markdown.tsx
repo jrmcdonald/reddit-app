@@ -1,9 +1,16 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { useOpenLink } from '@/hooks/use-open-link';
 import { radius, spacing, type as typeScale, useColors } from '@/theme';
-import { inlineText, parseMarkdown, type Block, type Inline } from '@/utils/markdown';
+import {
+  hasLink,
+  inlineText,
+  parseMarkdown,
+  type Align,
+  type Block,
+  type Inline,
+} from '@/utils/markdown';
 
 import { ThemedText } from './themed-text';
 
@@ -76,7 +83,88 @@ function BlockView({ block, size }: { block: Block; size: 'body' | 'small' }) {
       );
     case 'rule':
       return <View style={[styles.rule, { backgroundColor: colors.border }]} />;
+    case 'table':
+      return <Table block={block} size={size} />;
   }
+}
+
+/** Points per character, roughly, at the body size: for sizing columns before layout. */
+const CHAR_WIDTH = 8.5;
+const CELL_PADDING = spacing.sm * 2;
+const MIN_COLUMN = 56;
+const MAX_COLUMN = 240;
+
+/**
+ * A table, scrolling sideways when it is wider than the screen. Columns are
+ * sized from their longest cell, so every row lines up without measuring;
+ * a long cell wraps within its column. Each row is read as one element,
+ * every cell after its column's heading, unless a cell holds a link that
+ * VoiceOver must reach on its own.
+ */
+function Table({
+  block,
+  size,
+}: {
+  block: Extract<Block, { type: 'table' }>;
+  size: 'body' | 'small';
+}) {
+  const colors = useColors();
+  const { fontScale } = useWindowDimensions();
+  const text = size === 'small' ? styles.small : typeScale.body;
+  const scale = (size === 'small' ? 15 / 16 : 1) * fontScale;
+  const headings = block.header.map(inlineText);
+  const widths = block.align.map((_, column) => {
+    const longest = Math.max(
+      ...[block.header, ...block.rows].map((row) => inlineText(row[column] ?? []).length),
+    );
+    const width = Math.min(Math.max(longest * CHAR_WIDTH, MIN_COLUMN), MAX_COLUMN) * scale;
+    return Math.ceil(width + CELL_PADDING);
+  });
+
+  const row = (cells: Inline[][], index: number, header: boolean) => {
+    const label = header
+      ? `Table, ${block.rows.length} ${block.rows.length === 1 ? 'row' : 'rows'}. Columns: ${headings.join(', ')}`
+      : cells
+          .map((cell, column) => {
+            const heading = headings[column];
+            const value = inlineText(cell);
+            return heading ? `${heading}: ${value}` : value;
+          })
+          .join(', ');
+    const readAsOne = !cells.some(hasLink);
+    return (
+      <View
+        key={index}
+        accessible={readAsOne}
+        accessibilityLabel={readAsOne ? label : undefined}
+        style={[
+          styles.tableRow,
+          !header && { borderTopColor: colors.border, borderTopWidth: StyleSheet.hairlineWidth },
+          header && { backgroundColor: colors.surfaceRaised },
+        ]}>
+        {cells.map((cell, column) => (
+          <View key={column} style={[styles.cell, { width: widths[column] }]}>
+            <ThemedText style={[text, header && styles.bold, alignStyle(block.align[column] ?? null)]}>
+              <Runs nodes={cell} />
+            </ThemedText>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View style={[styles.table, { borderColor: colors.border }]}>
+        {row(block.header, -1, true)}
+        {block.rows.map((cells, index) => row(cells, index, false))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function alignStyle(align: Align) {
+  return align === 'center' ? styles.center : align === 'right' ? styles.right : null;
 }
 
 function Runs({ nodes }: { nodes: Inline[] }) {
@@ -165,6 +253,11 @@ const styles = StyleSheet.create({
   code: { borderRadius: radius.sm, padding: spacing.sm },
   mono: { fontFamily: 'Menlo', fontSize: 14, lineHeight: 19 },
   rule: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
+  table: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.sm, overflow: 'hidden' },
+  tableRow: { flexDirection: 'row' },
+  cell: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs + 2 },
+  center: { textAlign: 'center' },
+  right: { textAlign: 'right' },
   bold: { fontWeight: '700' },
   italic: { fontStyle: 'italic' },
   strike: { textDecorationLine: 'line-through' },
