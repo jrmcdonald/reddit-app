@@ -19,6 +19,11 @@ export function SearchField({ label, ...rest }: TextInputProps & { label: string
         autoCorrect={false}
         clearButtonMode="while-editing"
         returnKeyType="search"
+        // One line, as in TextField. Unpinned, the field took a different
+        // height on each run as the Saved list's header (screenshots
+        // caught it two, then three lines tall).
+        multiline={false}
+        numberOfLines={1}
         style={[styles.input, typeScale.body, { color: colors.text }]}
         {...rest}
       />
