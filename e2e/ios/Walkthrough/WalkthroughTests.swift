@@ -406,9 +406,18 @@ final class WalkthroughTests: XCTestCase {
 
   /// Taps, scrolling first when the element is below the fold, as it often
   /// is at the largest text sizes: a post's later comments can be four
-  /// screens down there.
+  /// screens down there. A list draws only the rows near the screen, so a
+  /// row further down may not exist at all until the list is scrolled to it.
   private func tap(_ element: XCUIElement) {
-    if !element.waitForExistence(timeout: 20) {
+    if !element.waitForExistence(timeout: 10) {
+      var searches = 0
+      while !element.exists, searches < 15 {
+        dismissSystemSheets()
+        app.swipeUp(velocity: .slow)
+        searches += 1
+      }
+    }
+    if !element.waitForExistence(timeout: 10) {
       diagnose("\(element) did not appear")
       XCTFail("\(element) did not appear")
       return
