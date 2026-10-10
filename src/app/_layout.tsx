@@ -91,6 +91,7 @@ function RootStack() {
           headerTitleStyle: { color: colors.text },
           contentStyle: { backgroundColor: colors.background },
         }}>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Protected guard={inApp}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="post/[id]" options={{ title: '' }} />
