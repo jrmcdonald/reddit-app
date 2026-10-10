@@ -16,11 +16,12 @@ export function TabStack({ title }: { title: string }) {
         headerLargeTitle: true,
         headerLargeTitleShadowVisible: false,
         headerShadowVisible: false,
-        headerTintColor: colors.accent,
+        // The titles take their colour from the tint, as pokecollector-app's
+        // do. With a colour in headerTitleStyle and headerLargeTitleStyle
+        // instead, no large title showed on the simulator, in either theme.
+        headerTintColor: colors.text,
         headerStyle: { backgroundColor: colors.background },
         headerLargeStyle: { backgroundColor: colors.background },
-        headerTitleStyle: { color: colors.text },
-        headerLargeTitleStyle: { color: colors.text },
         contentStyle: { backgroundColor: colors.background },
       }}>
       <Stack.Screen name="index" options={{ title }} />

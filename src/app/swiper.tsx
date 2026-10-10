@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -68,6 +69,8 @@ export default function SwiperScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* White, over the black backdrop, whatever the app's theme. */}
+      <StatusBar style="light" />
       <FlatList
         data={posts}
         keyExtractor={(post) => post.id}
