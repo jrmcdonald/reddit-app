@@ -77,7 +77,10 @@ final class WalkthroughTests: XCTestCase {
     capture("post")
     go(loadMore, to: button(startingWith: "saga_reader"), "More replies")
     capture("post-replies")
-    back(to: pinned, "Home, after the post")
+    // Home is left scrolled to that post at the largest text size, and the
+    // list unloads rows out of sight, the pinned one included; its header's
+    // sort button stays.
+    back(to: app.buttons["Sort: Best"], "Home, after the post")
 
     // Saved: posts, then comments.
     go(app.tabBars.buttons["Saved"], to: button(startingWith: "Fog rolling over the ridge"), "Saved")
