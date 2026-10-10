@@ -95,8 +95,9 @@ final class WalkthroughTests: XCTestCase {
     capture("subreddit")
     back(to: button(startingWith: "r/FogAndFells"), "Browse, again")
 
-    // Popular, with a spoiler covered.
-    go(app.tabBars.buttons["Popular"], to: button(startingWith: "That final scene"), "Popular")
+    // Popular, with a spoiler covered further down. Its first post, since
+    // at the largest text size the spoiler is out of sight and not loaded.
+    go(app.tabBars.buttons["Popular"], to: button(startingWith: "Fog rolling over the ridge"), "Popular")
     capture("popular")
 
     go(app.tabBars.buttons["Settings"], to: button(startingWith: "Browse anonymously"), "Settings")
