@@ -61,3 +61,12 @@ Native are large, old, or both, and miss Reddit's spoilers and superscript.
 `src/utils/markdown.ts` parses the subset Reddit uses into blocks and runs
 that `src/components/markdown.tsx` draws with native text, and anything it
 does not understand is shown as text. Tables are the known gap.
+
+## 2026-10-10 — Inline titles on the tab screens, not large titles
+
+The tab screens first used iOS's large titles, as pokecollector-app does.
+On the iOS 26 simulator the large title's space appeared but its text never
+did, in light and dark, with the title coloured by its style or by the tint.
+The same title in the navigation bar shows, so the tab screens use that,
+like every other screen. Worth trying large titles again after an Expo SDK
+upgrade.
