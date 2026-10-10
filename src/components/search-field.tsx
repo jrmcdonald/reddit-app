@@ -1,4 +1,10 @@
-import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import {
+  StyleSheet,
+  TextInput,
+  useWindowDimensions,
+  View,
+  type TextInputProps,
+} from 'react-native';
 
 import { minTapTarget, radius, spacing, type as typeScale, useColors } from '@/theme';
 
@@ -7,6 +13,11 @@ import { Icon } from './icon';
 /** A search box: magnifier, the field, and a clear button from iOS. */
 export function SearchField({ label, ...rest }: TextInputProps & { label: string }) {
   const colors = useColors();
+  // A height of its own, from the text size, rather than the one the input
+  // measures: in the Saved list's header that measure came out two or three
+  // lines tall now and then, at random (the walkthrough's screenshots).
+  const { fontScale } = useWindowDimensions();
+  const height = Math.ceil(typeScale.body.lineHeight * fontScale) + spacing.sm * 2;
   return (
     <View
       style={[styles.box, { backgroundColor: colors.surfaceRaised, borderColor: colors.outline }]}>
@@ -19,10 +30,10 @@ export function SearchField({ label, ...rest }: TextInputProps & { label: string
         autoCorrect={false}
         clearButtonMode="while-editing"
         returnKeyType="search"
-        // One line, as in TextField: the field never grows.
         multiline={false}
         numberOfLines={1}
-        style={[styles.input, typeScale.body, { color: colors.text }]}
+        // No lineHeight: on iOS it misplaces a one-line input's text.
+        style={[styles.input, { fontSize: typeScale.body.fontSize, height, color: colors.text }]}
         {...rest}
       />
     </View>
@@ -39,5 +50,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
   },
-  input: { flex: 1, paddingVertical: spacing.sm },
+  input: { flex: 1, paddingVertical: 0 },
 });
