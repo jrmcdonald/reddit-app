@@ -274,8 +274,24 @@ final class WalkthroughTests: XCTestCase {
     let seen = Set(first.map { $0.dropLast().joined(separator: "\t") })
     let second = auditPass(screen)
     for issue in second where seen.contains(issue.dropLast().joined(separator: "\t")) {
-      record(issue)
+      if Self.isUnderTabBar(issue) {
+        note(issue)
+      } else {
+        record(issue)
+      }
     }
+  }
+
+  /// Text found in the screen's pixels with no element at all. iOS 26 lets a
+  /// feed show faintly beneath the tab bar and the home indicator, and the
+  /// audit can read that text without matching it to its post, which is
+  /// further up and a VoiceOver swipe away. Which post sits there depends on
+  /// the layout above it, so these come and go with unrelated changes. They
+  /// go into audit.tsv, marked, but do not fail the run. An issue on a real
+  /// element, a missing label included, still does.
+  private static func isUnderTabBar(_ issue: [String]) -> Bool {
+    issue[1] == "elementDetection" && issue[2] == "Potentially inaccessible text"
+      && issue[3] == "(no label)" && issue[4].isEmpty
   }
 
   private func auditPass(_ screen: String) -> [[String]] {
@@ -305,6 +321,21 @@ final class WalkthroughTests: XCTestCase {
       .joined(separator: "\t")
     findings.append(line)
     print("AUDIT\t\(line)")
+    if let handle = try? FileHandle(forWritingTo: auditFile) {
+      handle.seekToEndOfFile()
+      handle.write(Data((line + "\n").utf8))
+      try? handle.close()
+    }
+  }
+
+  /// Writes a finding that does not fail the run, marked as such.
+  private func note(_ fields: [String]) {
+    var marked = fields
+    marked[2] += " (not counted: no element, likely beneath the tab bar)"
+    let line = marked
+      .map { $0.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ") }
+      .joined(separator: "\t")
+    print("AUDIT NOTE\t\(line)")
     if let handle = try? FileHandle(forWritingTo: auditFile) {
       handle.seekToEndOfFile()
       handle.write(Data((line + "\n").utf8))

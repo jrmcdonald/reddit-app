@@ -40,6 +40,10 @@ workflow on macOS runners. Nothing here ships in the app.
 - **Audit issues** are listed in the job summary, per text size, with the
   screen and the element. Fix them in the app. The screenshots in the run's
   `simulator-screenshots` artifact show the screen as the audit saw it.
+  One kind is listed but not counted: text read from the screen's pixels
+  with no element at all, marked "not counted". It is a feed showing
+  faintly beneath iOS 26's tab bar, and comes and goes as the layout above
+  it changes.
 - **A walkthrough step failed**: that size's `simulator (…)` job log shows
   what was on screen and what the app asked the fake Reddit for, and its
   `simulator-results-…` artifact has the `.xcresult`.

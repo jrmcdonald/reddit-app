@@ -70,3 +70,14 @@ did, in light and dark, with the title coloured by its style or by the tint.
 The same title in the navigation bar shows, so the tab screens use that,
 like every other screen. Worth trying large titles again after an Expo SDK
 upgrade.
+
+## 2026-10-10 — Audit text with no element is noted, not failed
+
+On iOS 26 a feed shows faintly through the tab bar and the home indicator's
+edge. Apple's audit can read that text from the screen's pixels without
+finding the element it belongs to, which is the post's row further up.
+Which post sits there depends on everything above it: the inline tab titles
+moved a cards-view title under the bar and failed a run. These findings,
+"Potentially inaccessible text" with no element, are written to `audit.tsv`
+marked "not counted" and do not fail the walkthrough. Every finding on an
+element still does, so a missing label or clipped text is still caught.
