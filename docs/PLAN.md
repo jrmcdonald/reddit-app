@@ -83,7 +83,8 @@ https://oauth.reddit.com  (Authorization: Bearer <access token>, raw_json=1)
 | Browse    | `(tabs)/browse`   | Subreddit search; subscriptions when signed in            |
 | Saved     | `(tabs)/saved`    | Posts / comments, filter; hidden in anonymous mode        |
 | Settings  | `(tabs)/settings` | Account, theme, default view, autoplay, NSFW and spoilers |
-| Subreddit | `r/[name]`        | About header, then its feed                               |
+| Muted     | `settings/muted`  | Muted words and subreddits                                |
+| Subreddit | `r/[name]`        | About header, then its feed; mute button                  |
 | Post      | `post/[id]`       | Media, Markdown body, comments; `?focus=` for one thread  |
 | Swiper    | `swiper`          | Fullscreen modal over a feed's cached pages               |
 
@@ -131,7 +132,7 @@ Every feed has a sort (Best/Hot/New/Top with a period/Rising) and a view
 
 - [x] Saved posts and comments, filter, save and unsave everywhere
 - [x] Fullscreen swiper over any feed, from the grid or the view buttons
-- [ ] Muted subreddits and keywords
+- [x] Muted subreddits and keywords
 
 ### Phase 5 — Polish
 
@@ -144,7 +145,7 @@ Every feed has a sort (Best/Hot/New/Top with a period/Rising) and a view
 ## 5. Settings
 
 Kept in AsyncStorage (`src/settings/preferences.ts`), nothing secret:
-theme, show NSFW, cover NSFW, cover spoilers, dim opened posts, default view, each feed's view,
+theme, show NSFW, cover NSFW, cover spoilers, dim opened posts, muted subreddits and words, default view, each feed's view,
 video autoplay (always, on Wi-Fi, never) and the comment sort.
 
 ---

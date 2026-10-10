@@ -101,3 +101,14 @@ forgotten first. A post counts as opened when its screen opens, from a feed,
 the swiper or a link. Feeds grey its title and VoiceOver says "opened".
 Settings can turn the dimming off or forget the list. It is the same for
 every account on the phone: it records what was read here, not who read it.
+
+## 2026-10-10 — Muting is filtered on the phone
+
+Reddit's own filtering of subreddits changes the account, which the app's
+read-and-save scopes are not for, and it has no muted words at all, so
+Perch keeps both lists in its settings and filters what it has loaded. A muted subreddit leaves Home and Popular but
+not its own page: opening it is asking for its posts. A muted word or
+phrase matches whole words in the title or flair, in any case, in every
+feed; the swiper uses the same filter as the feed beneath it. Saved is not
+filtered: a saved post was wanted. Muting costs no requests, but a page
+where every post is muted shows fewer posts.

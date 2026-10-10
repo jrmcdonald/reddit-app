@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState, type ReactNode } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, View } from 'react-native';
@@ -162,6 +163,11 @@ export default function SettingsScreen() {
           setting="dimOpened"
           preferences={preferences}
         />
+        <ListRow
+          title="Muted"
+          subtitle={mutedSummary(preferences)}
+          onPress={() => router.push('/settings/muted')}
+        />
       </Group>
 
       <Group title="About">
@@ -219,6 +225,18 @@ export default function SettingsScreen() {
       </View>
     </ScrollView>
   );
+}
+
+function mutedSummary({ mutedWords, mutedSubreddits }: Preferences): string {
+  const words = mutedWords.length;
+  const subreddits = mutedSubreddits.length;
+  if (!words && !subreddits) return 'Hide posts by word or subreddit';
+  return [
+    words ? `${words} ${words === 1 ? 'word' : 'words'}` : null,
+    subreddits ? `${subreddits} ${subreddits === 1 ? 'subreddit' : 'subreddits'}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
