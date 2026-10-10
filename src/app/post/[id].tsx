@@ -248,6 +248,8 @@ const styles = StyleSheet.create({
   banner: { minHeight: minTapTarget, paddingHorizontal: spacing.md, justifyContent: 'center' },
   commentBar: {
     flexDirection: 'row',
+    // At the largest text sizes the count and the sort no longer fit side by side.
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingLeft: spacing.md,

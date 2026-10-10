@@ -370,7 +370,8 @@ final class WalkthroughTests: XCTestCase {
   }
 
   /// Taps, scrolling first when the element is below the fold, as it often
-  /// is at the largest text sizes.
+  /// is at the largest text sizes: a post's later comments can be four
+  /// screens down there.
   private func tap(_ element: XCUIElement) {
     if !element.waitForExistence(timeout: 20) {
       diagnose("\(element) did not appear")
@@ -379,7 +380,7 @@ final class WalkthroughTests: XCTestCase {
     }
     dismissSystemSheets()
     var swipes = 0
-    while !element.isHittable, swipes < 6 {
+    while !element.isHittable, swipes < 15 {
       dismissSystemSheets()
       app.swipeUp(velocity: .slow)
       swipes += 1
