@@ -1,5 +1,7 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
+import { clearOpened, markOpened } from '@/session/opened';
+import { updatePreferences } from '@/settings/preferences';
 import type { Post } from '@/utils/posts';
 
 import { PostRow } from '../post/post-row';
@@ -33,6 +35,13 @@ const post: Post = {
 };
 
 describe('PostRow', () => {
+  afterEach(async () => {
+    await act(() => {
+      clearOpened();
+      updatePreferences({ dimOpened: true });
+    });
+  });
+
   it('reads the whole post as one button', async () => {
     await renderInApp(<PostRow post={post} />);
     expect(
@@ -60,5 +69,13 @@ describe('PostRow', () => {
   it('has no save button in anonymous mode', async () => {
     await renderInApp(<PostRow post={post} />, 'anonymous');
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+  });
+
+  it('says when the post has been opened, unless dimming is off', async () => {
+    markOpened('abc');
+    await renderInApp(<PostRow post={post} />);
+    expect(screen.getByRole('button', { name: /, NSFW, opened$/ })).toBeOnTheScreen();
+    await act(() => updatePreferences({ dimOpened: false }));
+    expect(screen.getByRole('button', { name: /, NSFW$/ })).toBeOnTheScreen();
   });
 });

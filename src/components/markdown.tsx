@@ -144,7 +144,8 @@ function Table({
         ]}>
         {cells.map((cell, column) => (
           <View key={column} style={[styles.cell, { width: widths[column] }]}>
-            <ThemedText style={[text, header && styles.bold, alignStyle(block.align[column] ?? null)]}>
+            <ThemedText
+              style={[text, header && styles.bold, alignStyle(block.align[column] ?? null)]}>
               <Runs nodes={cell} />
             </ThemedText>
           </View>

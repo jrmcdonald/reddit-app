@@ -91,3 +91,13 @@ wraps within its column, and a table wider than the screen scrolls
 sideways. VoiceOver reads each row as one element, each cell after its
 column's heading ("Count: 2"), except a row with a link, whose cells it
 reads one by one so the link can be followed.
+
+## 2026-10-10 — Opened posts are remembered on the phone
+
+Reddit records visited posts only for paying accounts, and never for
+anonymous mode, so Perch keeps its own list: the ids of the last 3,000
+posts opened, in AsyncStorage (`src/session/opened.ts`), the oldest
+forgotten first. A post counts as opened when its screen opens, from a feed,
+the swiper or a link. Feeds grey its title and VoiceOver says "opened".
+Settings can turn the dimming off or forget the list. It is the same for
+every account on the phone: it records what was read here, not who read it.

@@ -7,6 +7,7 @@ import { Alert, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { ListRow } from '@/components/list-row';
 import { Segmented } from '@/components/segmented';
 import { ThemedText } from '@/components/themed-text';
+import { clearOpened } from '@/session/opened';
 import { clearQueryCache } from '@/session/query';
 import { useReadySession, useSession } from '@/session/session';
 import { updatePreferences, usePreferences, type Preferences } from '@/settings/preferences';
@@ -155,6 +156,12 @@ export default function SettingsScreen() {
           setting="coverSpoilers"
           preferences={preferences}
         />
+        <Toggle
+          title="Dim opened posts"
+          subtitle="Grey the titles of posts you have read"
+          setting="dimOpened"
+          preferences={preferences}
+        />
       </Group>
 
       <Group title="About">
@@ -164,6 +171,17 @@ export default function SettingsScreen() {
           kind="action"
           onPress={() =>
             void clearQueryCache().then(() => Alert.alert('Cleared', 'Cached posts are gone.'))
+          }
+        />
+        <ListRow
+          title="Forget opened posts"
+          subtitle="Every title shows as unread"
+          kind="action"
+          onPress={() =>
+            Alert.alert('Forget opened posts?', 'Every post’s title shows as unread again.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Forget', style: 'destructive', onPress: clearOpened },
+            ])
           }
         />
         <ListRow
@@ -222,7 +240,7 @@ function Toggle({
 }: {
   title: string;
   subtitle: string;
-  setting: 'showNsfw' | 'coverNsfw' | 'coverSpoilers';
+  setting: 'showNsfw' | 'coverNsfw' | 'coverSpoilers' | 'dimOpened';
   preferences: Preferences;
 }) {
   const colors = useColors();

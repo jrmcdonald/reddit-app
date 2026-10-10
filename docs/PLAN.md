@@ -117,7 +117,7 @@ Every feed has a sort (Best/Hot/New/Top with a period/Rising) and a view
 - [x] List, cards and grid views, remembered per feed
 - [x] NSFW and spoiler covers; hiding NSFW posts
 - [x] Light and dark palettes, with contrast tests
-- [ ] Mark posts already opened (dimmed titles)
+- [x] Mark posts already opened (dimmed titles)
 
 ### Phase 3 — Posts and comments
 
@@ -144,7 +144,7 @@ Every feed has a sort (Best/Hot/New/Top with a period/Rising) and a view
 ## 5. Settings
 
 Kept in AsyncStorage (`src/settings/preferences.ts`), nothing secret:
-theme, show NSFW, cover NSFW, cover spoilers, default view, each feed's view,
+theme, show NSFW, cover NSFW, cover spoilers, dim opened posts, default view, each feed's view,
 video autoplay (always, on Wi-Fi, never) and the comment sort.
 
 ---

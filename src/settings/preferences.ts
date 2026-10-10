@@ -20,6 +20,8 @@ const PreferencesSchema = z.object({
   showNsfw: z.boolean().catch(true),
   coverNsfw: z.boolean().catch(true),
   coverSpoilers: z.boolean().catch(true),
+  /** Grey the titles of posts already opened. */
+  dimOpened: z.boolean().catch(true),
   /** The view a feed opens in until it is given its own. */
   defaultView: z.enum(VIEWS).catch('list'),
   /** Per feed ("home", "popular", "r/<name>"), the view last chosen for it. */
