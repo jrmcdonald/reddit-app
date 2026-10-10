@@ -43,6 +43,7 @@ export default function SwiperScreen() {
   const insets = useSafeAreaInsets();
   const [overlays, setOverlays] = useState(true);
   const [index, setIndex] = useState(0);
+  const [zoomed, setZoomed] = useState(false);
 
   const posts = useMemo(
     () => visiblePosts(query.data?.pages ?? [], feed, preferences, { visualOnly: true }),
@@ -74,6 +75,8 @@ export default function SwiperScreen() {
         data={posts}
         keyExtractor={(post) => post.id}
         pagingEnabled
+        // A zoomed picture takes the drags, to move about in it.
+        scrollEnabled={!zoomed}
         showsVerticalScrollIndicator={false}
         initialScrollIndex={initialIndex}
         getItemLayout={(_, i) => ({ length: height, offset: height * i, index: i })}
@@ -94,6 +97,7 @@ export default function SwiperScreen() {
             active={i === index}
             overlays={overlays}
             onToggleOverlays={() => setOverlays((shown) => !shown)}
+            onZoomChange={setZoomed}
           />
         )}
         ListEmptyComponent={

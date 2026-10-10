@@ -112,3 +112,15 @@ phrase matches whole words in the title or flair, in any case, in every
 feed; the swiper uses the same filter as the feed beneath it. Saved is not
 filtered: a saved post was wanted. Muting costs no requests, but a page
 where every post is muted shows fewer posts.
+
+## 2026-10-10 — Pinch to zoom with the gesture libraries already built in
+
+Zooming uses `react-native-gesture-handler` and Reanimated, which the
+navigation already brings into the build, so it costs no new dev client.
+One component (`src/components/zoomable-image.tsx`) pinches about the
+fingers, double-taps in and out, and keeps a zoomed picture inside its
+edges. A one-finger drag moves the picture only once it is zoomed;
+otherwise it goes to the list around it, and while zoomed the swiper and
+galleries stop scrolling. On the post screen a picture opens full screen
+over the post to zoom, rather than zooming in place in the scrolling list.
+Leaving a page zooms it back out.

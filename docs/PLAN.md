@@ -125,7 +125,7 @@ Every feed has a sort (Best/Hot/New/Top with a period/Rising) and a view
 - [x] Images, galleries, Reddit video and GIFs, link cards
 - [x] Markdown renderer: paragraphs, quotes, lists, code, emphasis, links, spoilers
 - [x] Comment tree with collapsing, "load more", "continue this thread"
-- [ ] Pinch to zoom in the swiper and on a post's image
+- [x] Pinch to zoom in the swiper and on a post's image
 - [x] Tables in Markdown
 
 ### Phase 4 — Saved and image modes

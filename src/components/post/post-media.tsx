@@ -21,6 +21,7 @@ import { pick, type Picture, type Post } from '@/utils/posts';
 import { Icon } from '../icon';
 import { ThemedText } from '../themed-text';
 import { ClipPlayer } from './clip-player';
+import { ImageViewer, type ViewerItem } from './image-viewer';
 import { MediaThumb } from './media-thumb';
 
 /** The tallest a picture gets on the post screen, as a share of its width. */
@@ -31,6 +32,7 @@ export function PostMedia({ post }: { post: Post }) {
   const { width } = useWindowDimensions();
   const { covered } = useCover(post);
   const autoplay = useAutoplay();
+  const [viewing, setViewing] = useState<number | null>(null);
   const media = post.media;
 
   if (media.kind === 'none') return null;
@@ -57,10 +59,26 @@ export function PostMedia({ post }: { post: Post }) {
       </View>
     );
   }
-  if (media.kind === 'image') {
-    return <FullWidthPicture picture={media.picture} width={width} height={height} label="Image" />;
-  }
-  return <Gallery items={media.items} width={width} height={height} />;
+  const items: ViewerItem[] =
+    media.kind === 'image' ? [{ picture: media.picture, caption: null }] : media.items;
+  return (
+    <>
+      {media.kind === 'image' ? (
+        <FullWidthPicture
+          picture={media.picture}
+          width={width}
+          height={height}
+          label="Image"
+          onPress={() => setViewing(0)}
+        />
+      ) : (
+        <Gallery items={media.items} width={width} height={height} onOpen={setViewing} />
+      )}
+      {viewing !== null ? (
+        <ImageViewer items={items} start={viewing} onClose={() => setViewing(null)} />
+      ) : null}
+    </>
+  );
 }
 
 function FullWidthPicture({
@@ -68,26 +86,31 @@ function FullWidthPicture({
   width,
   height,
   label,
+  onPress,
 }: {
   picture: Picture;
   width: number;
   height: number;
   label: string;
+  onPress(): void;
 }) {
   const colors = useColors();
   const reduceMotion = useReduceMotion();
   const source = pick(picture, width * PixelRatio.get());
   return (
-    <Image
-      source={{ uri: source.url }}
-      style={{ width, height, backgroundColor: colors.placeholder }}
-      contentFit="contain"
-      transition={reduceMotion ? 0 : 150}
-      accessible
-      accessibilityRole="image"
+    <Pressable
+      accessibilityRole="imagebutton"
       accessibilityLabel={label}
-      accessibilityIgnoresInvertColors
-    />
+      accessibilityHint="Opens it full screen, to zoom"
+      onPress={onPress}>
+      <Image
+        source={{ uri: source.url }}
+        style={{ width, height, backgroundColor: colors.placeholder }}
+        contentFit="contain"
+        transition={reduceMotion ? 0 : 150}
+        accessibilityIgnoresInvertColors
+      />
+    </Pressable>
   );
 }
 
@@ -95,10 +118,12 @@ function Gallery({
   items,
   width,
   height,
+  onOpen,
 }: {
   items: { picture: Picture; caption: string | null }[];
   width: number;
   height: number;
+  onOpen(index: number): void;
 }) {
   const [index, setIndex] = useState(0);
   const caption = items[index]?.caption;
@@ -119,6 +144,7 @@ function Gallery({
             width={width}
             height={height}
             label={`Image ${i + 1} of ${items.length}${item.caption ? `: ${item.caption}` : ''}`}
+            onPress={() => onOpen(i)}
           />
         )}
       />
