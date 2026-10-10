@@ -1,9 +1,9 @@
 /**
  * The Markdown Reddit uses in posts and comments, parsed into blocks and
  * inline runs that `components/markdown.tsx` draws. A deliberate subset:
- * paragraphs, headings, quotes, lists, code, rules, emphasis, links,
- * spoilers and superscript. Tables come through as plain lines. Anything
- * not understood is shown as the text it is, never dropped.
+ * paragraphs, headings, quotes, lists, code, rules, tables, emphasis,
+ * links, spoilers and superscript. Anything not understood is shown as the
+ * text it is, never dropped.
  */
 
 export type Inline =
@@ -18,7 +18,10 @@ export type Block =
   | { type: 'quote'; blocks: Block[] }
   | { type: 'list'; ordered: boolean; start: number; items: Block[][] }
   | { type: 'code'; text: string }
-  | { type: 'rule' };
+  | { type: 'rule' }
+  | { type: 'table'; align: Align[]; header: Inline[][]; rows: Inline[][][] };
+
+export type Align = 'left' | 'center' | 'right' | null;
 
 const FENCE = /^\s{0,3}(```|~~~)/;
 const HEADING = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/;
@@ -27,6 +30,8 @@ const QUOTE = /^\s{0,3}>(?!!)\s?(.*)$/;
 const BULLET = /^(\s{0,3})([-*+])\s+(.*)$/;
 const NUMBER = /^(\s{0,3})(\d{1,9})[.)]\s+(.*)$/;
 const INDENTED = /^( {4}|\t)(.*)$/;
+/** A table's second line: `---`, `:--`, `--:` or `:-:` between pipes. */
+const DELIMITER = /^\s{0,3}\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
 
 export function parseMarkdown(source: string): Block[] {
   const lines = source.replace(/\r\n?/g, '\n').split('\n');
@@ -80,6 +85,14 @@ function parseBlocks(lines: string[]): Block[] {
       }
       while (body.length && !(body[body.length - 1] as string).trim()) body.pop();
       blocks.push({ type: 'code', text: body.join('\n') });
+      continue;
+    }
+
+    const table = tableAt(lines, i);
+    if (table) {
+      flush();
+      blocks.push(table.block);
+      i = table.end;
       continue;
     }
 
@@ -154,6 +167,72 @@ function parseBlocks(lines: string[]): Block[] {
   }
   flush();
   return blocks;
+}
+
+/**
+ * A table starting at `lines[start]`: a header row, a delimiter row with as
+ * many columns, then body rows until a blank line or a line with no pipe.
+ * Rows with too few cells are padded, and extra cells dropped, as Reddit does.
+ */
+function tableAt(lines: string[], start: number): { block: Block; end: number } | null {
+  const headerLine = lines[start] as string;
+  const delimiterLine = lines[start + 1];
+  if (!headerLine.includes('|') || delimiterLine === undefined) return null;
+  if (!DELIMITER.test(delimiterLine) || !delimiterLine.includes('-')) return null;
+  const headerCells = splitRow(headerLine);
+  const delimiterCells = splitRow(delimiterLine);
+  // A lone "---" under a line is a heading's underline or a rule, not a table.
+  if (!delimiterLine.includes('|') && headerCells.length < 2) return null;
+  if (headerCells.length !== delimiterCells.length) return null;
+
+  const align = delimiterCells.map((cell): Align => {
+    const left = cell.startsWith(':');
+    const right = cell.endsWith(':');
+    return left && right ? 'center' : right ? 'right' : left ? 'left' : null;
+  });
+  const fit = (cells: string[]) =>
+    align.map((_, column) => parseInline((cells[column] ?? '').trim()));
+
+  const rows: Inline[][][] = [];
+  let i = start + 2;
+  while (i < lines.length) {
+    const line = lines[i] as string;
+    if (!line.trim() || !line.includes('|')) break;
+    rows.push(fit(splitRow(line)));
+    i++;
+  }
+  return { block: { type: 'table', align, header: fit(headerCells), rows }, end: i };
+}
+
+/**
+ * A table row's cells, split on its pipes: not an escaped `\|`, nor one in a
+ * code span. The pipes at either end are optional.
+ */
+function splitRow(line: string): string[] {
+  const cells: string[] = [];
+  let cell = '';
+  let code = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i] as string;
+    if (ch === '\\' && line[i + 1] === '|') {
+      cell += '\\|';
+      i++;
+    } else if (ch === '`') {
+      code = !code;
+      cell += ch;
+    } else if (ch === '|' && !code) {
+      cells.push(cell);
+      cell = '';
+    } else {
+      cell += ch;
+    }
+  }
+  cells.push(cell);
+  if (/^\s*$/.test(cells[0] ?? '') && line.trimStart().startsWith('|')) cells.shift();
+  if (cells.length && /^\s*$/.test(cells[cells.length - 1] ?? '') && line.trimEnd().endsWith('|')) {
+    cells.pop();
+  }
+  return cells.map((c) => c.trim());
 }
 
 function isBlockStart(line: string): boolean {
@@ -341,4 +420,13 @@ export function inlineText(nodes: Inline[]): string {
       return inlineText(node.children);
     })
     .join('');
+}
+
+/** Whether inline runs hold a link anywhere. */
+export function hasLink(nodes: Inline[]): boolean {
+  return nodes.some(
+    (node) =>
+      node.type === 'link' ||
+      (node.type !== 'text' && node.type !== 'code' && hasLink(node.children)),
+  );
 }

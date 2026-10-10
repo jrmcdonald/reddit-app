@@ -15,7 +15,8 @@ import { usePullToRefresh } from '@/hooks/use-pull-to-refresh';
 import { setFeedView, usePreferences, viewFor } from '@/settings/preferences';
 import { spacing, useColors } from '@/theme';
 import { defaultSort, feedParam } from '@/utils/feeds';
-import { isVisual, type Post } from '@/utils/posts';
+import { visiblePosts } from '@/utils/mute';
+import type { Post } from '@/utils/posts';
 
 import { PostCard } from '../post/post-card';
 import { PostRow } from '../post/post-row';
@@ -51,18 +52,12 @@ export function Feed({
   const { refreshing, onRefresh } = usePullToRefresh(query.refetch);
   const showSubreddit = feed.kind !== 'subreddit';
 
-  const posts = useMemo(() => {
-    const all = query.data?.pages.flatMap((page) => page.items) ?? [];
-    // Pages can overlap when posts move between fetches; show each once.
-    const seen = new Set<string>();
-    return all.filter((post) => {
-      if (seen.has(post.id)) return false;
-      seen.add(post.id);
-      if (post.nsfw && !preferences.showNsfw) return false;
-      if (view === 'grid' && !isVisual(post.media)) return false;
-      return true;
-    });
-  }, [query.data, preferences.showNsfw, view]);
+  const posts = useMemo(
+    () => visiblePosts(query.data?.pages ?? [], feed, preferences, { visualOnly: view === 'grid' }),
+    // The feed object is new each render; its key says the same.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [query.data, preferences, view, key],
+  );
 
   const openSwiper = (start?: Post) =>
     router.push({

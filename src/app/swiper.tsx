@@ -18,7 +18,8 @@ import { useFeed } from '@/hooks/queries';
 import { usePreferences } from '@/settings/preferences';
 import { minTapTarget, spacing } from '@/theme';
 import { defaultSort, parseFeed, parsePeriod, parseSort } from '@/utils/feeds';
-import { isVisual, type Post } from '@/utils/posts';
+import { visiblePosts } from '@/utils/mute';
+import type { Post } from '@/utils/posts';
 
 /**
  * A feed's pictures and videos full screen, one post at a time: swipe up for
@@ -42,15 +43,14 @@ export default function SwiperScreen() {
   const insets = useSafeAreaInsets();
   const [overlays, setOverlays] = useState(true);
   const [index, setIndex] = useState(0);
+  const [zoomed, setZoomed] = useState(false);
 
-  const posts = useMemo(() => {
-    const seen = new Set<string>();
-    return (query.data?.pages.flatMap((page) => page.items) ?? []).filter((post: Post) => {
-      if (seen.has(post.id) || !isVisual(post.media)) return false;
-      seen.add(post.id);
-      return preferences.showNsfw || !post.nsfw;
-    });
-  }, [query.data, preferences.showNsfw]);
+  const posts = useMemo(
+    () => visiblePosts(query.data?.pages ?? [], feed, preferences, { visualOnly: true }),
+    // The feed is parsed anew each render; its param says the same.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [query.data, preferences, params.feed],
+  );
 
   // Where to open: the tapped tile's post, once, and then wherever the person is.
   const [initialIndex] = useState(() => {
@@ -75,6 +75,8 @@ export default function SwiperScreen() {
         data={posts}
         keyExtractor={(post) => post.id}
         pagingEnabled
+        // A zoomed picture takes the drags, to move about in it.
+        scrollEnabled={!zoomed}
         showsVerticalScrollIndicator={false}
         initialScrollIndex={initialIndex}
         getItemLayout={(_, i) => ({ length: height, offset: height * i, index: i })}
@@ -95,6 +97,7 @@ export default function SwiperScreen() {
             active={i === index}
             overlays={overlays}
             onToggleOverlays={() => setOverlays((shown) => !shown)}
+            onZoomChange={setZoomed}
           />
         )}
         ListEmptyComponent={

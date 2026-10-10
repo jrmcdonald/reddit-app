@@ -9,6 +9,7 @@ import { useSyncExternalStore } from 'react';
 import { z } from 'zod';
 
 import { COMMENT_SORTS } from '@/api/endpoints';
+import { subredditKey, wordKey } from '@/utils/mute';
 
 /** How a feed is laid out. The swiper is not one: it opens over the feed. */
 export const VIEWS = ['list', 'cards', 'grid'] as const;
@@ -20,6 +21,12 @@ const PreferencesSchema = z.object({
   showNsfw: z.boolean().catch(true),
   coverNsfw: z.boolean().catch(true),
   coverSpoilers: z.boolean().catch(true),
+  /** Grey the titles of posts already opened. */
+  dimOpened: z.boolean().catch(true),
+  /** Subreddits left out of Home and Popular, as typed: compared without case. */
+  mutedSubreddits: z.array(z.string()).catch([]),
+  /** Words and phrases whose posts are left out of every feed. */
+  mutedWords: z.array(z.string()).catch([]),
   /** The view a feed opens in until it is given its own. */
   defaultView: z.enum(VIEWS).catch('list'),
   /** Per feed ("home", "popular", "r/<name>"), the view last chosen for it. */
@@ -88,4 +95,32 @@ export function viewFor(preferences: Preferences, feedKey: string): View {
 
 export function setFeedView(feedKey: string, view: View) {
   updatePreferences({ feedViews: { ...current.feedViews, [feedKey]: view } });
+}
+
+/** Mutes or unmutes a subreddit, once whatever its case. */
+export function setSubredditMuted(name: string, muted: boolean) {
+  const key = subredditKey(name);
+  if (!key) return;
+  const rest = current.mutedSubreddits.filter((s) => subredditKey(s) !== key);
+  updatePreferences({
+    mutedSubreddits: muted ? [...rest, name.trim().replace(/^\/?r\//i, '')] : rest,
+  });
+}
+
+export function isSubredditMuted(preferences: Preferences, name: string): boolean {
+  const key = subredditKey(name);
+  return preferences.mutedSubreddits.some((s) => subredditKey(s) === key);
+}
+
+/** Adds a muted word or phrase, once; returns false if it was empty or there already. */
+export function addMutedWord(word: string): boolean {
+  const key = wordKey(word);
+  if (!key || current.mutedWords.some((w) => wordKey(w) === key)) return false;
+  updatePreferences({ mutedWords: [...current.mutedWords, word.trim().replace(/\s+/g, ' ')] });
+  return true;
+}
+
+export function removeMutedWord(word: string) {
+  const key = wordKey(word);
+  updatePreferences({ mutedWords: current.mutedWords.filter((w) => wordKey(w) !== key) });
 }

@@ -1,7 +1,14 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import type { SavedItem } from '@/api/endpoints';
 import { Markdown } from '@/components/markdown';
@@ -25,6 +32,7 @@ type Tab = 'links' | 'comments';
  */
 export default function SavedScreen() {
   const colors = useColors();
+  const { width } = useWindowDimensions();
   const [tab, setTab] = useState<Tab>('links');
   const [filter, setFilter] = useState('');
   const query = useSavedListing(tab);
@@ -41,7 +49,9 @@ export default function SavedScreen() {
   }, [query.data, filter]);
 
   const header = (
-    <View style={styles.header}>
+    // The screen's width from the first layout: measured narrower, the
+    // filter field's placeholder wrapped and the field kept that height.
+    <View style={[styles.header, { width }]}>
       <Segmented<Tab>
         label="Saved"
         value={tab}

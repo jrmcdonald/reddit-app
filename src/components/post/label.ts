@@ -4,7 +4,10 @@ import type { Post } from '@/utils/posts';
 import { describeMedia } from './media-thumb';
 
 /** Everything a post row says, in one VoiceOver label. */
-export function postLabel(post: Post, options: { subreddit?: boolean } = {}): string {
+export function postLabel(
+  post: Post,
+  options: { subreddit?: boolean; opened?: boolean } = {},
+): string {
   const parts = [post.title];
   if (options.subreddit !== false) parts.push(`r/${post.subreddit}`);
   parts.push(`by ${post.author}`, ageSpoken(post.createdUtc));
@@ -13,5 +16,6 @@ export function postLabel(post: Post, options: { subreddit?: boolean } = {}): st
   if (post.stickied) parts.push('pinned');
   if (post.nsfw) parts.push('NSFW');
   if (post.spoiler) parts.push('spoiler');
+  if (options.opened) parts.push('opened');
   return parts.join(', ');
 }

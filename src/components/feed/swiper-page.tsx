@@ -1,10 +1,8 @@
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, PixelRatio, Pressable, StyleSheet, View } from 'react-native';
 
 import { useAutoplay } from '@/hooks/use-autoplay';
-import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useCover } from '@/session/revealed';
 import { useReadySession } from '@/session/session';
 import { minTapTarget, spacing, type as typeScale } from '@/theme';
@@ -13,6 +11,7 @@ import { pick, type Picture, type Post } from '@/utils/posts';
 
 import { Icon } from '../icon';
 import { ThemedText } from '../themed-text';
+import { ZoomableImage } from '../zoomable-image';
 import { ClipPlayer } from '../post/clip-player';
 import { describeMedia } from '../post/media-thumb';
 import { SaveButton } from '../post/save-button';
@@ -32,6 +31,7 @@ export function SwiperPage({
   active,
   overlays,
   onToggleOverlays,
+  onZoomChange,
 }: {
   post: Post;
   width: number;
@@ -40,11 +40,18 @@ export function SwiperPage({
   active: boolean;
   overlays: boolean;
   onToggleOverlays(): void;
+  /** Zoomed in on a picture: the swiper stops swiping until it zooms out. */
+  onZoomChange(zoomed: boolean): void;
 }) {
   const session = useReadySession();
   const { covered, reason, reveal } = useCover(post);
   const autoplay = useAutoplay();
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [zoomed, setZoomed] = useState(false);
+  const zoom = (next: boolean) => {
+    setZoomed(next);
+    onZoomChange(next);
+  };
   const media = post.media;
 
   let body;
@@ -69,6 +76,7 @@ export function SwiperPage({
         data={media.items}
         keyExtractor={(_, index) => `${post.id}-${index}`}
         showsHorizontalScrollIndicator={false}
+        scrollEnabled={!zoomed}
         onMomentumScrollEnd={(event) =>
           setGalleryIndex(Math.round(event.nativeEvent.contentOffset.x / width))
         }
@@ -79,6 +87,9 @@ export function SwiperPage({
             height={height}
             label={`Image ${index + 1} of ${media.items.length}${item.caption ? `: ${item.caption}` : ''}`}
             onPress={onToggleOverlays}
+            onZoomChange={zoom}
+            // Another picture in the gallery, or another post: zoom back out.
+            reset={`${active}-${galleryIndex}`}
           />
         )}
       />
@@ -100,6 +111,8 @@ export function SwiperPage({
         height={height}
         label={describeMedia(post)}
         onPress={onToggleOverlays}
+        onZoomChange={zoom}
+        reset={active}
       />
     );
   } else {
@@ -169,30 +182,30 @@ function FullPicture({
   height,
   label,
   onPress,
+  onZoomChange,
+  reset,
 }: {
   picture: Picture;
   width: number;
   height: number;
   label: string;
   onPress(): void;
+  onZoomChange(zoomed: boolean): void;
+  reset: unknown;
 }) {
-  const reduceMotion = useReduceMotion();
   const source = pick(picture, width * PixelRatio.get());
   return (
-    <Pressable
-      accessibilityRole="image"
-      accessibilityLabel={label}
-      accessibilityHint="Double-tap to hide or show the caption"
-      onPress={onPress}
-      style={{ width, height }}>
-      <Image
-        source={{ uri: source.url }}
-        style={StyleSheet.absoluteFill}
-        contentFit="contain"
-        transition={reduceMotion ? 0 : 150}
-        accessibilityIgnoresInvertColors
-      />
-    </Pressable>
+    <ZoomableImage
+      uri={source.url}
+      aspect={picture.aspect}
+      width={width}
+      height={height}
+      label={label}
+      hint="Double-tap to hide or show the caption. Pinch to zoom"
+      onTap={onPress}
+      onZoomChange={onZoomChange}
+      reset={reset}
+    />
   );
 }
 

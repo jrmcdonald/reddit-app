@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useOpened } from '@/session/opened';
+import { usePreferences } from '@/settings/preferences';
 import { spacing, useColors } from '@/theme';
 import { plainText } from '@/utils/markdown-plain';
 import type { Post } from '@/utils/posts';
@@ -22,6 +24,8 @@ const THUMB = 76;
  */
 export function PostRow({ post, showSubreddit = true }: { post: Post; showSubreddit?: boolean }) {
   const colors = useColors();
+  const { dimOpened } = usePreferences();
+  const opened = useOpened(post.id) && dimOpened;
   const open = () => router.push({ pathname: '/post/[id]', params: { id: post.id } });
   const preview = post.media.kind === 'none' && post.body ? plainText(post.body) : '';
   const hasThumb = post.media.kind !== 'none';
@@ -30,11 +34,13 @@ export function PostRow({ post, showSubreddit = true }: { post: Post; showSubred
       style={[styles.row, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={postLabel(post, { subreddit: showSubreddit })}
+        accessibilityLabel={postLabel(post, { subreddit: showSubreddit, opened })}
         onPress={open}
         style={({ pressed }) => [styles.main, pressed && { opacity: 0.6 }]}>
         <PostSource post={post} showSubreddit={showSubreddit} />
-        <ThemedText variant="postTitle">{post.title}</ThemedText>
+        <ThemedText variant="postTitle" color={opened ? 'textSecondary' : 'text'}>
+          {post.title}
+        </ThemedText>
         <PostBadges post={post} />
         {preview ? (
           <ThemedText variant="caption" color="textSecondary" numberOfLines={2}>

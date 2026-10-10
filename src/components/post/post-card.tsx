@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
+import { useOpened } from '@/session/opened';
+import { usePreferences } from '@/settings/preferences';
 import { spacing, useColors } from '@/theme';
 import { plainText } from '@/utils/markdown-plain';
 import { thumbnailOf, type Post } from '@/utils/posts';
@@ -22,6 +24,8 @@ const MAX_HEIGHT = 1.25;
  */
 export function PostCard({ post, showSubreddit = true }: { post: Post; showSubreddit?: boolean }) {
   const colors = useColors();
+  const { dimOpened } = usePreferences();
+  const opened = useOpened(post.id) && dimOpened;
   const { width } = useWindowDimensions();
   const open = () => router.push({ pathname: '/post/[id]', params: { id: post.id } });
   const picture = thumbnailOf(post.media);
@@ -32,11 +36,13 @@ export function PostCard({ post, showSubreddit = true }: { post: Post; showSubre
     <View style={[styles.card, { backgroundColor: colors.surface }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={postLabel(post, { subreddit: showSubreddit })}
+        accessibilityLabel={postLabel(post, { subreddit: showSubreddit, opened })}
         onPress={open}
         style={({ pressed }) => [styles.head, pressed && { opacity: 0.6 }]}>
         <PostSource post={post} showSubreddit={showSubreddit} />
-        <ThemedText variant="postTitle">{post.title}</ThemedText>
+        <ThemedText variant="postTitle" color={opened ? 'textSecondary' : 'text'}>
+          {post.title}
+        </ThemedText>
         <PostBadges post={post} />
         {preview ? (
           <ThemedText color="textSecondary" numberOfLines={4}>

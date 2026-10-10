@@ -19,6 +19,9 @@ export function SearchField({ label, ...rest }: TextInputProps & { label: string
         autoCorrect={false}
         clearButtonMode="while-editing"
         returnKeyType="search"
+        // One line, as in TextField: the field never grows.
+        multiline={false}
+        numberOfLines={1}
         style={[styles.input, typeScale.body, { color: colors.text }]}
         {...rest}
       />

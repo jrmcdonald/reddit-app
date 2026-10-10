@@ -60,7 +60,7 @@ Posts and comments are Reddit Markdown. The JavaScript renderers for React
 Native are large, old, or both, and miss Reddit's spoilers and superscript.
 `src/utils/markdown.ts` parses the subset Reddit uses into blocks and runs
 that `src/components/markdown.tsx` draws with native text, and anything it
-does not understand is shown as text. Tables are the known gap.
+does not understand is shown as text.
 
 ## 2026-10-10 — Inline titles on the tab screens, not large titles
 
@@ -81,3 +81,46 @@ moved a cards-view title under the bar and failed a run. These findings,
 "Potentially inaccessible text" with no element, are written to `audit.tsv`
 marked "not counted" and do not fail the walkthrough. Every finding on an
 element still does, so a missing label or clipped text is still caught.
+
+## 2026-10-10 — Tables sized from their text, not measured
+
+Markdown tables draw row by row, each column as wide as its longest cell
+(about 8.5 points a character, between 56 and 240, scaled with the text
+size), so rows line up without measuring every cell first. A longer cell
+wraps within its column, and a table wider than the screen scrolls
+sideways. VoiceOver reads each row as one element, each cell after its
+column's heading ("Count: 2"), except a row with a link, whose cells it
+reads one by one so the link can be followed.
+
+## 2026-10-10 — Opened posts are remembered on the phone
+
+Reddit records visited posts only for paying accounts, and never for
+anonymous mode, so Perch keeps its own list: the ids of the last 3,000
+posts opened, in AsyncStorage (`src/session/opened.ts`), the oldest
+forgotten first. A post counts as opened when its screen opens, from a feed,
+the swiper or a link. Feeds grey its title and VoiceOver says "opened".
+Settings can turn the dimming off or forget the list. It is the same for
+every account on the phone: it records what was read here, not who read it.
+
+## 2026-10-10 — Muting is filtered on the phone
+
+Reddit's own filtering of subreddits changes the account, which the app's
+read-and-save scopes are not for, and it has no muted words at all, so
+Perch keeps both lists in its settings and filters what it has loaded. A muted subreddit leaves Home and Popular but
+not its own page: opening it is asking for its posts. A muted word or
+phrase matches whole words in the title or flair, in any case, in every
+feed; the swiper uses the same filter as the feed beneath it. Saved is not
+filtered: a saved post was wanted. Muting costs no requests, but a page
+where every post is muted shows fewer posts.
+
+## 2026-10-10 — Pinch to zoom with the gesture libraries already built in
+
+Zooming uses `react-native-gesture-handler` and Reanimated, which the
+navigation already brings into the build, so it costs no new dev client.
+One component (`src/components/zoomable-image.tsx`) pinches about the
+fingers, double-taps in and out, and keeps a zoomed picture inside its
+edges. A one-finger drag moves the picture only once it is zoomed;
+otherwise it goes to the list around it, and while zoomed the swiper and
+galleries stop scrolling. On the post screen a picture opens full screen
+over the post to zoom, rather than zooming in place in the scrolling list.
+Leaving a page zooms it back out.

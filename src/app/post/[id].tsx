@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActionSheetIOS, Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { COMMENT_SORTS, fetchMoreChildren, type CommentSort } from '@/api/endpoints';
@@ -15,6 +15,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { useThread } from '@/hooks/queries';
+import { markOpened } from '@/session/opened';
 import { useReadySession } from '@/session/session';
 import { updatePreferences, usePreferences } from '@/settings/preferences';
 import { minTapTarget, spacing, useColors } from '@/theme';
@@ -39,6 +40,9 @@ export default function PostScreen() {
   const preferences = usePreferences();
   const sort = preferences.commentSort;
   const thread = useThread(id, sort, focus ?? null);
+
+  // Opened: its title is dimmed in feeds from now on.
+  useEffect(() => markOpened(id), [id]);
 
   // Comments loaded behind "load more" placeholders, in the order they were
   // loaded, grafted onto Reddit's tree where each placeholder was.

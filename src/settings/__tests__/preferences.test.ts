@@ -1,4 +1,14 @@
-import { DEFAULTS, parsePreferences, viewFor } from '../preferences';
+import {
+  addMutedWord,
+  DEFAULTS,
+  getPreferences,
+  isSubredditMuted,
+  parsePreferences,
+  removeMutedWord,
+  setSubredditMuted,
+  updatePreferences,
+  viewFor,
+} from '../preferences';
 
 describe('preferences', () => {
   it('starts from defaults that cover NSFW and spoilers', () => {
@@ -32,5 +42,32 @@ describe('preferences', () => {
     };
     expect(viewFor(prefs, 'r/example')).toBe('grid');
     expect(viewFor(prefs, 'home')).toBe('cards');
+  });
+});
+
+describe('muting', () => {
+  beforeEach(() => updatePreferences({ mutedWords: [], mutedSubreddits: [] }));
+
+  it('adds a word once, in one form, and removes it whatever its case', () => {
+    expect(addMutedWord('  New   season ')).toBe(true);
+    expect(addMutedWord('new season')).toBe(false);
+    expect(addMutedWord('   ')).toBe(false);
+    expect(getPreferences().mutedWords).toEqual(['New season']);
+    removeMutedWord('NEW SEASON');
+    expect(getPreferences().mutedWords).toEqual([]);
+  });
+
+  it('mutes a subreddit once whatever its case, and unmutes it', () => {
+    setSubredditMuted('r/AskHistorians', true);
+    setSubredditMuted('askhistorians', true);
+    expect(getPreferences().mutedSubreddits).toEqual(['askhistorians']);
+    expect(isSubredditMuted(getPreferences(), 'AskHistorians')).toBe(true);
+    setSubredditMuted('ASKHISTORIANS', false);
+    expect(isSubredditMuted(getPreferences(), 'AskHistorians')).toBe(false);
+  });
+
+  it('keeps stored mutes, and drops a stored value that is not a list', () => {
+    expect(parsePreferences(JSON.stringify({ mutedWords: ['cats'] })).mutedWords).toEqual(['cats']);
+    expect(parsePreferences(JSON.stringify({ mutedWords: 'cats' })).mutedWords).toEqual([]);
   });
 });

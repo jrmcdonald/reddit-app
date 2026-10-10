@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Appearance, StyleSheet, useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { loadOpened } from '@/session/opened';
 import { QueryProvider } from '@/session/query';
 import { RevealedProvider } from '@/session/revealed';
 import { SavedProvider } from '@/session/saved';
@@ -32,7 +33,7 @@ function useAppScheme(): Scheme {
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    loadPreferences().finally(() => setReady(true));
+    Promise.all([loadPreferences(), loadOpened()]).finally(() => setReady(true));
   }, []);
   const scheme = useAppScheme();
   const colors = palettes[scheme];
